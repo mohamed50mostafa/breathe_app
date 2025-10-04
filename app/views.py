@@ -641,9 +641,3 @@ class AIAdviceAPIView(APIView):
         
         للمزيد من النصائح المخصصة، يرجى المحاولة مرة أخرى لاحقاً.
         """
-    # .gitignore
-    # __pycache__/
-    # *.pyc
-    # .env  
-    # db.sqlite3
-    # /staticfiles/
