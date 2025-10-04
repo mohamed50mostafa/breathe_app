@@ -31,10 +31,10 @@ NASA_EARTHDATA_PASSWORD = os.getenv('NASA_EARTHDATA_PASSWORD')
 SECRET_KEY = 'django-insecure-e=jiq0!l6+z7p-s0rp2(p*snyr$vw72ual3d-1k^4r8@)(4$un'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 # In your settings.py file
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost','*]
 
 
 # Application definition
@@ -100,6 +100,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500", 
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    '*'
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 # CORS_ALLOW_CREDENTIALS = True
