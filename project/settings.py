@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.gis',
+    # 'django.contrib.gis',
     'corsheaders',
     
     'rest_framework',
@@ -129,18 +129,11 @@ WSGI_APPLICATION = 'project.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-if os.name == 'nt':  # Windows
-    GDAL_LIBRARY_PATH = r'C:\Program Files\GDAL\gdal.dll' # تأكد من رقم الإصدار
-    GEOS_LIBRARY_PATH = r'C:\Program Files\GDAL\geos_c.dll'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'myproject_db',
-        'USER': 'postgres',
-        'PASSWORD': 'Aa102030@', # غيرها بكلمة مرورك
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
