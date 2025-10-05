@@ -31,10 +31,8 @@ DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = [
     '127.0.0.1', 
     'localhost',
-    '.up.railway.app',
-    '.onrender.com',
-    '.vercel.app',
-    '*'
+    '*.up.railway.app',
+    '*',
 ]
 
 # Add Railway static URL if exists
@@ -136,6 +134,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://*.up.railway.app",
+    "http://*.up.railway.app",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
