@@ -1,5 +1,6 @@
 """
 Django settings for project project.
+Compatible with Django 5.0
 """
 
 from pathlib import Path
@@ -21,7 +22,7 @@ NASA_EARTHDATA_USERNAME = os.getenv('NASA_EARTHDATA_USERNAME')
 NASA_EARTHDATA_PASSWORD = os.getenv('NASA_EARTHDATA_PASSWORD')
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-this-in-production-12345')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-this-in-production-' + os.urandom(24).hex())
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
@@ -32,6 +33,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '.up.railway.app',
     '.onrender.com',
+    '.vercel.app',
     '*'
 ]
 
@@ -80,7 +82,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.AllowAny',  # Change to IsAuthenticated for production
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -92,21 +94,27 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
     'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
 }
 
-# Allauth settings - UPDATED (no deprecation warnings)
+# Allauth settings for Django 5.0
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 ACCOUNT_LOGIN_METHODS = {'username', 'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email', 'username*', 'password1*', 'password2*']
 ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_EMAIL_REQUIRED = False
+ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+ACCOUNT_UNIQUE_EMAIL = True
 
 # Dj-rest-auth settings
 REST_AUTH = {
     'USE_JWT': False,
     'REGISTER_SERIALIZER': 'dj_rest_auth.registration.serializers.RegisterSerializer',
     'LOGIN_SERIALIZER': 'dj_rest_auth.serializers.LoginSerializer',
+    'USER_DETAILS_SERIALIZER': 'dj_rest_auth.serializers.UserDetailsSerializer',
 }
 
 MIDDLEWARE = [
@@ -119,7 +127,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'allauth.account.middleware.AccountMiddleware',
+    # Note: allauth.account.middleware.AccountMiddleware is not needed in newer versions
 ]
 
 # CORS settings
@@ -130,11 +138,35 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "https://*.up.railway.app",
 ]
 
+# For development - can be disabled in production
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 ROOT_URLCONF = 'project.urls'
 
@@ -156,7 +188,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'project.wsgi.application'
 
-# Database Configuration
+# Database Configuration for Django 5.0
 # Primary configuration for Railway PostgreSQL
 if os.environ.get('DATABASE_URL'):
     DATABASES = {
@@ -164,6 +196,7 @@ if os.environ.get('DATABASE_URL'):
             default=os.environ.get('DATABASE_URL'),
             conn_max_age=600,
             conn_health_checks=True,
+            ssl_require=not DEBUG
         )
     }
 elif all([
@@ -181,6 +214,9 @@ elif all([
             'PASSWORD': os.environ.get('PGPASSWORD'),
             'HOST': os.environ.get('PGHOST'),
             'PORT': os.environ.get('PGPORT', '5432'),
+            'OPTIONS': {
+                'sslmode': 'require' if not DEBUG else 'prefer',
+            }
         }
     }
 else:
@@ -199,6 +235,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 8,
+        }
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -239,7 +278,9 @@ if not DEBUG:
     
     # Session settings
     SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
     CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
     
     # Security headers
     SECURE_BROWSER_XSS_FILTER = True
@@ -250,25 +291,69 @@ if not DEBUG:
     
     # Additional security
     X_FRAME_OPTIONS = 'DENY'
+    SECURE_REFERRER_POLICY = 'same-origin'
+    
+else:
+    # Development settings
+    CORS_ALLOW_ALL_ORIGINS = True
+    ALLOWED_HOSTS = ['*']
 
 # Logging configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'debug.log',
+            'formatter': 'verbose',
         },
     },
     'root': {
         'handlers': ['console'],
-        'level': 'WARNING',
+        'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
             'propagate': False,
         },
+        'django.request': {
+            'handlers': ['console', 'file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
     },
+}
+
+# Cache configuration (optional)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+# Email configuration (optional)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+
+# Custom settings
+GOOGLE_GENERATIVE_AI_CONFIG = {
+    'temperature': 0.7,
+    'max_output_tokens': 2048,
 }
