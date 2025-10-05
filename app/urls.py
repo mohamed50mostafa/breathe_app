@@ -10,7 +10,7 @@ from .views import (
     FutureAirQualityAPIView,  # تم تصحيح اسم الفئة
     FutureWeatherAPIView      # تم تصحيح اسم الفئة
 )
-from .healthcheck import health_check
+
 urlpatterns = [
     path('air-quality/', AirQualityAPIView.as_view(), name='air_quality'),
     path('safety-score/', SafetyScoreAPIView.as_view(), name='safety_score'),
@@ -21,5 +21,4 @@ urlpatterns = [
     path('ai-advice/', AIAdviceAPIView.as_view(), name='ai_advice'),
     path('future-air-quality/', FutureAirQualityAPIView.as_view(), name='future_air_quality'),  # تم التصحيح
     path('future-weather/', FutureWeatherAPIView.as_view(), name='future_weather'),  # تم التصحيح
-    path('health/', health_check, name='health_check'),  # إضافة مسار فحص الصحة
 ]

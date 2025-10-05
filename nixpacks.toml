@@ -2,7 +2,6 @@
 cmds = [
     "apt-get update",
     "apt-get install -y libsqlite3-dev libpq5 python3-dev build-essential",
-    "apt-get install -y postgresql-client",
 ]
 
 [phases.install]
