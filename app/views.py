@@ -257,7 +257,37 @@ def find_nearest_safe_location(lat, lon, locations):
     locations_with_scores.sort(key=lambda x: (x[1], x[2]))
     return locations_with_scores[0][0] if locations_with_scores else None
 
-# API VIEWS - الإصدار النهائي
+# SAFETY SCORE CALCULATION - UPDATED TO 100 SCALE
+def calculate_safety_score_from_aqi(aqi):
+    """
+    حساب درجة السلامة على مقياس 100 بناءً على جودة الهواء
+    AQI: 1=ممتاز, 2=جيد, 3=متوسط, 4=سيء, 5=خطير
+    """
+    safety_scores = {
+        1: 95,   # ممتاز
+        2: 80,   # جيد
+        3: 60,   # متوسط
+        4: 35,   # سيء
+        5: 15    # خطير
+    }
+    return safety_scores.get(aqi, 60)  # افتراضي 60 إذا كانت القيمة غير متوقعة
+
+def get_safety_level(score):
+    """تحديد مستوى السلامة بناءً على الدرجة"""
+    if score >= 90:
+        return "ممتاز"
+    elif score >= 75:
+        return "جيد جداً"
+    elif score >= 60:
+        return "جيد"
+    elif score >= 45:
+        return "متوسط"
+    elif score >= 30:
+        return "سيء"
+    else:
+        return "خطير"
+
+# API VIEWS - الإصدار النهائي مع تحديث Safety Score
 class AirQualityAPIView(APIView):
     def get(self, request):
         lat = request.query_params.get('lat')
@@ -305,9 +335,14 @@ class FutureAirQualityAPIView(APIView):
             future_date = datetime.utcnow() + timedelta(days=day)
             # تغيير طفيف في AQI (±1)
             predicted_aqi = max(1, min(5, current_aqi + random.randint(-1, 1)))
+            safety_score = calculate_safety_score_from_aqi(predicted_aqi)
+            safety_level = get_safety_level(safety_score)
+            
             future_data.append({
                 'date': future_date.strftime('%Y-%m-%d'),
-                'predicted_aqi': predicted_aqi
+                'predicted_aqi': predicted_aqi,
+                'safety_score': safety_score,
+                'safety_level': safety_level
             })
             
         return Response({'future_air_quality': future_data})
@@ -329,8 +364,14 @@ class SafetyScoreAPIView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)
 
         air_quality = get_combined_air_quality(lat, lon).get('aqi', 3)
-        safety_score = max(1, 6 - air_quality)
-        return Response({'safety_score': safety_score})
+        safety_score = calculate_safety_score_from_aqi(air_quality)
+        safety_level = get_safety_level(safety_score)
+        
+        return Response({
+            'safety_score': safety_score,
+            'safety_level': safety_level,
+            'air_quality_index': air_quality
+        })
 
 class BestRouteAPIView(APIView):
     def get(self, request):
@@ -391,10 +432,18 @@ class NearestSafeLocationAPIView(APIView):
             return Response({'error': 'No safe locations found.'}, 
                           status=status.HTTP_404_NOT_FOUND)
             
+        # حساب درجة السلامة للموقع الآمن
+        loc_air_quality = get_combined_air_quality(nearest_location[0], nearest_location[1]).get('aqi', 3)
+        safety_score = calculate_safety_score_from_aqi(loc_air_quality)
+        safety_level = get_safety_level(safety_score)
+            
         return Response({
             'nearest_safe_location': {
                 'lat': nearest_location[0], 
-                'lon': nearest_location[1]
+                'lon': nearest_location[1],
+                'safety_score': safety_score,
+                'safety_level': safety_level,
+                'air_quality_index': loc_air_quality
             }
         })
 
@@ -415,13 +464,16 @@ class ComprehensiveSafetyAPIView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)
 
         air_quality = get_combined_air_quality(lat, lon).get('aqi', 3)
-        safety_score = max(1, 6 - air_quality)
+        safety_score = calculate_safety_score_from_aqi(air_quality)
+        safety_level = get_safety_level(safety_score)
         nasa_data = get_nasa_earth_data(lat, lon)
 
         return Response({
-            'air_quality': air_quality,
+            'air_quality_index': air_quality,
             'safety_score': safety_score,
-            'nasa_earth_data': nasa_data
+            'safety_level': safety_level,
+            'nasa_earth_data': nasa_data,
+            'location': {'lat': lat, 'lon': lon}
         })
 
 class WeatherAPIView(APIView):
@@ -499,8 +551,7 @@ class FutureWeatherAPIView(APIView):
             })
         return Response(forecast)
 
-# AI ADVICE - الإصدار النهائي
-# AI ADVICE - الإصدار المصحح
+# AI ADVICE - الإصدار المصحح مع Safety Score 100
 try:
     import google.generativeai as genai
     if hasattr(settings, 'GOOGLE_API_KEY') and settings.GOOGLE_API_KEY:
@@ -559,19 +610,25 @@ class AIAdviceAPIView(APIView):
             weather_data = get_weather_api_data(lat, lon)
            
             aqi = air_quality_data.get('aqi', 3)
-            safety_score = max(1, 6 - aqi)
+            safety_score = calculate_safety_score_from_aqi(aqi)
+            safety_level = get_safety_level(safety_score)
             
             # إنشاء السياق
             context = f"""
             الموقع: خط العرض {lat}, خط الطول {lon}
-            درجة السلامة: {safety_score}/5
+            درجة السلامة: {safety_score}/100 - {safety_level}
             جودة الهواء: {aqi}/5 (1=ممتاز, 5=خطير)
             حالة الطقس: {weather_data.get('current', {}).get('condition', {}).get('text', 'غير معروف')}
             درجة الحرارة: {weather_data.get('current', {}).get('temp_c', 'غير معروف')}°C
             الرطوبة: {weather_data.get('current', {}).get('humidity', 'غير معروف')}%
-            الزحام المروري : 
             
-             و اي شيء ما يقلل التلوث و تلطف درجة الحرة .كن قدم النصائح الازمة بناءً على هذه البيانات بشكل بسيط و واضح للمستخدم حاول تقديم له تحثيرات لاصحاب الامراض المزمنة و كبار السن و الاطفالو كن ودودا  و لا تستخدم مصطلحات معقدة و اجعل النصائح عملية و سهلة الاتباع باقصى حد للاسطر 10  و انصح بزراعة النباتات للتقليل من التوث و اعتدال درجة الحرار .
+            قدم نصائح عملية للسلامة البيئية والصحية بناءً على هذه البيانات. 
+            ركز على:
+            - نصائح لأصحاب الأمراض المزمنة وكبار السن والأطفال
+            - اقتراحات لتحسين جودة الهواء وتلطيف درجة الحرارة
+            - تشجيع زراعة النباتات للتقليل من التلوث
+            - نصائح للتعامل مع الزحام المروري
+            كن ودوداً واستخدم لغة بسيطة واضحة وغير معقدة.
             """
 
             # استخدام Gemini API مع النموذج الصحيح
@@ -608,7 +665,8 @@ class AIAdviceAPIView(APIView):
             return Response({
                 'advice': advice,
                 'safety_score': safety_score,
-                'air_quality': aqi,
+                'safety_level': safety_level,
+                'air_quality_index': aqi,
                 'location': {'lat': lat, 'lon': lon}
             })
             
